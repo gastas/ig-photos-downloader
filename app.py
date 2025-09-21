@@ -50,6 +50,9 @@ if st.button("Fetch posts"):
                 photo_urls = []
                 for idx, item in enumerate(data[:5], start=1):
                     if "displayUrl" in item:
+                        # route image through CORS proxy
+                        proxy_url = f"https://go.x2u.in/proxy?email=stas@gastas.net&apiKey=aa4afcde&url={item['displayUrl']}"
+
                         col1, col2 = st.columns([1, 4])
                         with col1:
                             selected = st.checkbox(
@@ -57,11 +60,8 @@ if st.button("Fetch posts"):
                                 key=f"{username}_{idx}"
                             )
                         with col2:
-                            st.image(item["displayUrl"], caption=item.get("text", ""), use_container_width=True)
+                            st.image(proxy_url, caption=item.get("text", ""), width="stretch")  # use width instead of use_container_width
                             st.markdown(f"[Open in Instagram]({item['url']})")
-
-                        if selected:
-                            photo_urls.append(item["displayUrl"])
 
                 # store results for export
                 row = {"username": username}
