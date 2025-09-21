@@ -8,7 +8,7 @@ st.title("📸 Instagram Scraper via Apify")
 
 st.markdown(
     """
-    This tool fetches the **latest 5 posts** from Instagram profiles using  
+    This tool fetches the latest photos from Instagram profiles using  
     [Apify Instagram Scraper](https://apify.com/apify/instagram-scraper).  
     ⚠️ You need an **Apify API Token** (get it from your [Apify Console](https://console.apify.com/)).
     """
@@ -17,16 +17,13 @@ st.markdown(
 apify_token = st.text_input("🔑 Enter your Apify API Token", type="password")
 usernames = st.text_area("👥 Enter Instagram usernames (one per line)", "instagram\nnatgeo")
 
-# temporary storage for selections
-if "results" not in st.session_state:
-    st.session_state.results = []
+results = []
 
-if st.button("Fetch posts"):
+if st.button("Fetch photos"):
     if not apify_token or not usernames.strip():
         st.error("❌ You must provide an API Token and at least one username")
     else:
         usernames_list = [u.strip().lstrip("@") for u in usernames.split("\n") if u.strip()]
-        st.session_state.results = []  # reset
 
         for username in usernames_list:
             st.subheader(f"@{username}")
@@ -35,7 +32,7 @@ if st.button("Fetch posts"):
             params = {"token": apify_token}
             payload = {
                 "directUrls": [f"https://www.instagram.com/{username}/"],
-                "resultsLimit": 5,
+                "resultsLimit": 4,  # always fetch 4 latest photos
             }
 
             try:
@@ -48,36 +45,27 @@ if st.button("Fetch posts"):
                     continue
 
                 photo_urls = []
-                for idx, item in enumerate(data[:5], start=1):
+                for item in data[:4]:
                     if "displayUrl" in item:
-                        # route image through CORS proxy
-                        proxy_url = f"https://go.x2u.in/proxy?email=stas@gastas.net&apiKey=aa4afcde&url={item['displayUrl']}"
+                        photo_urls.append(item["displayUrl"])
+                        st.image(item["displayUrl"], caption=item.get("text", ""), use_container_width=True)
+                        st.markdown(f"[Open post in Instagram]({item['url']})")
 
-                        col1, col2 = st.columns([1, 4])
-                        with col1:
-                            selected = st.checkbox(
-                                f"Select post {idx}",
-                                key=f"{username}_{idx}"
-                            )
-                        with col2:
-                            st.image(proxy_url, caption=item.get("text", ""), width="stretch")  # use width instead of use_container_width
-                            st.markdown(f"[Open in Instagram]({item['url']})")
-
-                # store results for export
+                # store results in table
                 row = {"username": username}
-                for i in range(5):
+                for i in range(4):
                     row[f"photo_{i+1}"] = photo_urls[i] if i < len(photo_urls) else ""
-                st.session_state.results.append(row)
+                results.append(row)
 
             except Exception as e:
                 st.error(f"Error: {e}")
 
 # CSV export
-if st.session_state.results:
-    df = pd.DataFrame(st.session_state.results)
+if results:
+    df = pd.DataFrame(results)
     csv_buffer = StringIO()
     df.to_csv(csv_buffer, index=False)
-    st.success("✅ Your selection is ready! Download below.")
+    st.success("✅ Data collected! You can download the CSV file below.")
     st.download_button(
         label="⬇️ Download CSV",
         data=csv_buffer.getvalue(),
