@@ -17,9 +17,10 @@ st.markdown(
 apify_token = st.text_input("🔑 Enter your Apify API Token", type="password")
 usernames = st.text_area("👥 Enter Instagram usernames (one per line)", "instagram\nnatgeo")
 
+selected_posts = {}  # store user selections
 results = []
 
-if st.button("Fetch photos"):
+if st.button("Fetch last 5 posts"):
     if not apify_token or not usernames.strip():
         st.error("❌ You must provide an API Token and at least one username")
     else:
@@ -32,7 +33,7 @@ if st.button("Fetch photos"):
             params = {"token": apify_token}
             payload = {
                 "directUrls": [f"https://www.instagram.com/{username}/"],
-                "resultsLimit": 4,  # always fetch 4 latest photos
+                "resultsLimit": 5,  # always fetch last 5 posts
             }
 
             try:
@@ -44,28 +45,35 @@ if st.button("Fetch photos"):
                     st.warning("⚠️ No posts found. The account might be private or empty.")
                     continue
 
-                photo_urls = []
-                for item in data[:4]:
-                    if "displayUrl" in item:
-                        photo_urls.append(item["displayUrl"])
-                        st.image(item["displayUrl"], caption=item.get("text", ""), use_container_width=True)
-                        st.markdown(f"[Open post in Instagram]({item['url']})")
+                selected_posts[username] = []
 
-                # store results in table
-                row = {"username": username}
-                for i in range(4):
-                    row[f"photo_{i+1}"] = photo_urls[i] if i < len(photo_urls) else ""
-                results.append(row)
+                for i, item in enumerate(data[:5], start=1):
+                    image_url = item.get("displayUrl", "")
+                    permalink = item.get("url", "")
+                    caption = item.get("text", "")
+
+                    if image_url and "images.apifyusercontent.com" in image_url:
+                        st.image(image_url, caption=f"Post {i}: {caption}", use_container_width=True)
+                        if st.checkbox(f"Add Post {i} to CSV ({username})", key=f"{username}_{i}"):
+                            selected_posts[username].append(image_url)
+                            st.markdown(f"[Open in Instagram]({permalink})")
 
             except Exception as e:
                 st.error(f"Error: {e}")
 
 # CSV export
+if selected_posts:
+    for username, photos in selected_posts.items():
+        row = {"username": username}
+        for i, url in enumerate(photos, start=1):
+            row[f"photo_{i}"] = url
+        results.append(row)
+
 if results:
     df = pd.DataFrame(results)
     csv_buffer = StringIO()
     df.to_csv(csv_buffer, index=False)
-    st.success("✅ Data collected! You can download the CSV file below.")
+    st.success("✅ Data ready! Download CSV below.")
     st.download_button(
         label="⬇️ Download CSV",
         data=csv_buffer.getvalue(),
